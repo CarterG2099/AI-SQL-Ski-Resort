@@ -4,72 +4,72 @@
   "questionResults": [
     {
       "question": "Which are the highest rated resorts and what is the average rating of each?",
-      "sql": "\nSELECT r.name, AVG(re.rating) AS average_rating\nFROM ikon_resorts r\nJOIN ikon_reviews re ON r.resort_id = re.resort_id\nGROUP BY r.resort_id\nORDER BY average_rating DESC;\n",
+      "sql": "\nSELECT r.name, AVG(rv.rating) AS average_rating\nFROM ikon_resorts r\nJOIN ikon_reviews rv ON r.resort_id = rv.resort_id\nGROUP BY r.resort_id\nORDER BY average_rating DESC;\n",
       "queryRawResponse": "[('Whistler Blackcomb', 4.333333333333333), ('Park City Mountain', 4.0), ('Aspen Snowmass', 4.0)]",
-      "friendlyResponse": "Here are the highest-rated resorts along with their average ratings: \n\n- Whistler Blackcomb: 4.33\n- Park City Mountain: 4.00\n- Aspen Snowmass: 4.00",
+      "friendlyResponse": "The highest-rated resorts and their average ratings are:\n\n- Whistler Blackcomb: 4.33\n- Park City Mountain: 4.00\n- Aspen Snowmass: 4.00",
       "error": "None"
     },
     {
       "question": "Which users rented equipment for more than 3 days and which resorts did they visit and what was the total cost of their trip including equipment and lift ticket?",
-      "sql": "\nSELECT \n    u.user_id,\n    u.first_name,\n    u.last_name,\n    r.name AS resort_name,\n    SUM(rn.cost) AS total_equipment_cost,\n    SUM(lt.price) AS total_lift_ticket_cost,\n    (SUM(rn.cost) + SUM(lt.price)) AS total_trip_cost\nFROM \n    ikon_users AS u\nJOIN \n    ikon_rentals AS rn ON u.user_id = rn.user_id\nJOIN \n    ikon_lift_tickets AS lt ON u.user_id = lt.user_id\nJOIN \n    ikon_resorts AS r ON lt.resort_id = r.resort_id\nWHERE \n    julianday(rn.return_date) - julianday(rn.rental_date) > 3\nGROUP BY \n    u.user_id, r.resort_id;\n",
-      "queryRawResponse": "[(1, 'Laura', 'Stevenson', 'Aspen Snowmass', 200.0, 120.0, 320.0), (2, 'Bob', 'Jones', 'Whistler Blackcomb', 180.0, 150.0, 330.0)]",
-      "friendlyResponse": "Sure! Here\u2019s the information you requested:\n\n- **Laura Stevenson**: Rented equipment at **Aspen Snowmass** for a total of **$320.00**.\n- **Bob Jones**: Rented equipment at **Whistler Blackcomb** for a total of **$330.00**.",
+      "sql": "\nSELECT \n    u.user_id,\n    u.first_name,\n    u.last_name,\n    r.name AS resort_name,\n    SUM(COALESCE(rent.cost, 0) + COALESCE(t.price, 0)) AS total_cost\nFROM \n    ikon_users u\nJOIN \n    ikon_rentals rent ON u.user_id = rent.user_id\nJOIN \n    ikon_lift_tickets t ON u.user_id = t.user_id\nJOIN \n    ikon_resorts r ON t.resort_id = r.resort_id\nWHERE \n    julianday(rent.return_date) - julianday(rent.rental_date) > 3\nGROUP BY \n    u.user_id, r.resort_id;\n",
+      "queryRawResponse": "[(1, 'Laura', 'Stevenson', 'Aspen Snowmass', 320.0), (2, 'Bob', 'Jones', 'Whistler Blackcomb', 330.0)]",
+      "friendlyResponse": "Here are the details of the users who rented equipment for more than 3 days:\n\n- **Laura Stevenson** visited **Aspen Snowmass** with a total trip cost of **$320.00**.\n- **Bob Jones** visited **Whistler Blackcomb** with a total trip cost of **$330.00**.",
       "error": "None"
     },
     {
       "question": "What is the ratio of people who rent equipment and ski double black vs those who ski blue?",
-      "sql": "\nSELECT \n    (SELECT COUNT(DISTINCT user_id) \n     FROM ikon_rentals \n     WHERE equipment_type = 'Ski' AND user_id IN \n         (SELECT DISTINCT user_id \n          FROM ikon_reviews \n          WHERE rating >= 4 AND trail_id IN \n              (SELECT trail_id FROM ikon_trails WHERE difficulty = 'Double Black'))) AS double_black_skiers,\n    (SELECT COUNT(DISTINCT user_id) \n     FROM ikon_rentals \n     WHERE equipment_type = 'Ski' AND user_id IN \n         (SELECT DISTINCT user_id \n          FROM ikon_reviews \n          WHERE rating >= 4 AND trail_id IN \n              (SELECT trail_id FROM ikon_trails WHERE difficulty = 'Blue'))) AS blue_skiers;\n",
-      "queryRawResponse": "[(1, 'Laura', 'Stevenson', 'Aspen Snowmass', 200.0, 120.0, 320.0), (2, 'Bob', 'Jones', 'Whistler Blackcomb', 180.0, 150.0, 330.0)]",
-      "friendlyResponse": "Sure! Here\u2019s the information you requested:\n\n- **Laura Stevenson**: Rented equipment at **Aspen Snowmass** for a total of **$320.00**.\n- **Bob Jones**: Rented equipment at **Whistler Blackcomb** for a total of **$330.00**.",
-      "error": "no such column: trail_id"
+      "sql": "\nSELECT \n    SUM(CASE WHEN r.equipment_type = 'Ski' AND t.difficulty = 'Double Black' THEN 1 ELSE 0 END) * 1.0 /\n    NULLIF(SUM(CASE WHEN r.equipment_type = 'Ski' AND t.difficulty = 'Blue' THEN 1 ELSE 0 END), 0) AS ratio\nFROM \n    ikon_rentals r\nJOIN \n    ikon_users u ON r.user_id = u.user_id\nJOIN \n    ikon_trails t ON u.skill_level = t.difficulty;\n",
+      "queryRawResponse": "[(None,)]",
+      "friendlyResponse": "It looks like there are no records for people who rented equipment and skied double black trails or blue trails. Therefore, the ratio cannot be determined at this time.",
+      "error": "None"
     },
     {
       "question": "What is the average temperature and snow depth for each resort in January 2025?",
-      "sql": "\nSELECT r.name, \n       AVG(w.temperature_c) AS average_temperature, \n       AVG(w.snow_depth_cm) AS average_snow_depth\nFROM ikon_weather_reports w\nJOIN ikon_resorts r ON w.resort_id = r.resort_id\nWHERE w.report_date BETWEEN '2025-01-01' AND '2025-01-31'\nGROUP BY r.resort_id;\n",
+      "sql": "\nSELECT r.name AS resort_name, \n       AVG(w.temperature_c) AS average_temperature, \n       AVG(w.snow_depth_cm) AS average_snow_depth\nFROM ikon_weather_reports w\nJOIN ikon_resorts r ON w.resort_id = r.resort_id\nWHERE strftime('%Y-%m', w.report_date) = '2025-01'\nGROUP BY r.resort_id;\n",
       "queryRawResponse": "[('Aspen Snowmass', -5.0, 50.0), ('Whistler Blackcomb', -3.0, 60.0), ('Park City Mountain', -8.0, 70.0)]",
-      "friendlyResponse": "In January 2025, the average temperatures and snow depths for the resorts are as follows: \n\n- Aspen Snowmass: -5.0\u00b0C, 50.0 cm of snow\n- Whistler Blackcomb: -3.0\u00b0C, 60.0 cm of snow\n- Park City Mountain: -8.0\u00b0C, 70.0 cm of snow",
+      "friendlyResponse": "In January 2025, the average temperatures and snow depths for each resort were:\n\n- Aspen Snowmass: -5.0\u00b0C, 50.0 cm of snow\n- Whistler Blackcomb: -3.0\u00b0C, 60.0 cm of snow\n- Park City Mountain: -8.0\u00b0C, 70.0 cm of snow",
       "error": "None"
     },
     {
       "question": "Which people travelled out of state to ski and what was the total cost of their trip?",
-      "sql": "\nSELECT u.user_id, u.first_name, u.last_name, SUM(r.cost) AS total_trip_cost\nFROM ikon_users u\nJOIN ikon_rentals r ON u.user_id = r.user_id\nWHERE r.rental_date IS NOT NULL AND u.state != (SELECT state FROM ikon_address WHERE entity_id = u.user_id AND entity_type = 'User')\nGROUP BY u.user_id;\n",
-      "queryRawResponse": "[('Aspen Snowmass', -5.0, 50.0), ('Whistler Blackcomb', -3.0, 60.0), ('Park City Mountain', -8.0, 70.0)]",
-      "friendlyResponse": "In January 2025, the average temperatures and snow depths for the resorts are as follows: \n\n- Aspen Snowmass: -5.0\u00b0C, 50.0 cm of snow\n- Whistler Blackcomb: -3.0\u00b0C, 60.0 cm of snow\n- Park City Mountain: -8.0\u00b0C, 70.0 cm of snow",
-      "error": "no such column: u.state"
+      "sql": "\nSELECT u.first_name, u.last_name, SUM(r.cost) AS total_trip_cost\nFROM ikon_users u\nJOIN ikon_rentals r ON u.user_id = r.user_id\nJOIN ikon_address a ON u.user_id = a.entity_id AND a.entity_type = 'User'\nWHERE a.state != 'YourState'  -- Replace 'YourState' with the relevant state for local users\nGROUP BY u.user_id;\n",
+      "queryRawResponse": "[('Laura', 'Stevenson', 200.0), ('Bob', 'Jones', 180.0), ('Charlie', 'Brown', 20.0)]",
+      "friendlyResponse": "Here are the skiers who traveled out of state along with the total cost of their trips:\n\n- Laura Stevenson: $200.00\n- Bob Jones: $180.00\n- Charlie Brown: $20.00",
+      "error": "None"
     },
     {
       "question": "What is the ratio of people who got the base, session, and plus passes and what is the total revenue from those passes?",
-      "sql": "\nSELECT \n    ticket_type, \n    COUNT(user_id) AS total_passes, \n    SUM(price) AS total_revenue,\n    (COUNT(user_id) * 1.0 / (SELECT COUNT(*) FROM ikon_lift_tickets)) AS pass_ratio\nFROM ikon_lift_tickets\nGROUP BY ticket_type;\n",
-      "queryRawResponse": "[('Base', 1, 120.0, 0.3333333333333333), ('Plus', 1, 200.0, 0.3333333333333333), ('Session', 1, 150.0, 0.3333333333333333)]",
-      "friendlyResponse": "Here's the breakdown of the passes:\n\n- Base Pass: 1 (Revenue: $120.00, Ratio: 33.33%)\n- Plus Pass: 1 (Revenue: $200.00, Ratio: 33.33%)\n- Session Pass: 1 (Revenue: $150.00, Ratio: 33.33%)\n\nTotal Revenue: $470.00",
+      "sql": "\nSELECT \n    ticket_type, \n    COUNT(user_id) AS total_passes, \n    SUM(price) AS total_revenue \nFROM \n    ikon_lift_tickets \nGROUP BY \n    ticket_type;\n",
+      "queryRawResponse": "[('Base', 1, 120.0), ('Plus', 1, 200.0), ('Session', 1, 150.0)]",
+      "friendlyResponse": "Here\u2019s the breakdown of the lift ticket types and their total revenue:\n\n- **Base Pass**: 1 ticket sold for $120.00\n- **Plus Pass**: 1 ticket sold for $200.00\n- **Session Pass**: 1 ticket sold for $150.00\n\nIf you have any more questions, feel free to ask!",
       "error": "None"
     },
     {
       "question": "Which resort has the highest elevation, and how many trails does it offer?",
-      "sql": "\nSELECT name, elevation, total_trails FROM ikon_resorts \nORDER BY elevation DESC \nLIMIT 1;\n",
-      "queryRawResponse": "[('Aspen Snowmass', 8104, 150)]",
-      "friendlyResponse": "The resort with the highest elevation is Aspen Snowmass, at 8,104 feet, and it offers 150 trails!",
+      "sql": "\nSELECT name, total_trails \nFROM ikon_resorts \nWHERE elevation = (SELECT MAX(elevation) FROM ikon_resorts);\n",
+      "queryRawResponse": "[('Aspen Snowmass', 150)]",
+      "friendlyResponse": "The resort with the highest elevation is Aspen Snowmass, and it offers 150 trails.",
       "error": "None"
     },
     {
       "question": "What is the distribution of skill levels among users who visited Aspen Snowmass?",
       "sql": "\nSELECT skill_level, COUNT(*) as count\nFROM ikon_users\nJOIN ikon_lift_tickets ON ikon_users.user_id = ikon_lift_tickets.user_id\nJOIN ikon_resorts ON ikon_lift_tickets.resort_id = ikon_resorts.resort_id\nWHERE ikon_resorts.name = 'Aspen Snowmass'\nGROUP BY skill_level;\n",
       "queryRawResponse": "[('Advanced', 1)]",
-      "friendlyResponse": "It looks like 1 user who visited Aspen Snowmass is classified as an advanced skier.",
+      "friendlyResponse": "The distribution of skill levels among users who visited Aspen Snowmass shows that there's 1 user at the Advanced skill level.",
       "error": "None"
     },
     {
       "question": "What is the average length of 'Green' trails across all resorts?",
-      "sql": "\nSELECT AVG(length_km) AS average_length \nFROM ikon_trails \nWHERE difficulty = 'Green';\n",
+      "sql": "\nSELECT AVG(length_km) AS average_length\nFROM ikon_trails\nWHERE difficulty = 'Green';\n",
       "queryRawResponse": "[(6.0,)]",
-      "friendlyResponse": "The average length of 'Green' trails across all resorts is 6.0.",
+      "friendlyResponse": "The average length of 'Green' trails across all resorts is 6.0 km.",
       "error": "None"
     },
     {
       "question": "Which resort has the highest combined rating from all user reviews?",
-      "sql": "\nSELECT r.name, SUM(re.rating) AS total_rating\nFROM ikon_reviews re\nJOIN ikon_resorts r ON re.resort_id = r.resort_id\nGROUP BY r.resort_id\nORDER BY total_rating DESC\nLIMIT 1;\n",
+      "sql": "\nSELECT r.name, SUM(rv.rating) AS total_rating\nFROM ikon_reviews rv\nJOIN ikon_resorts r ON rv.resort_id = r.resort_id\nGROUP BY r.resort_id\nORDER BY total_rating DESC\nLIMIT 1;\n",
       "queryRawResponse": "[('Whistler Blackcomb', 26)]",
-      "friendlyResponse": "The resort with the highest combined rating from all user reviews is Whistler Blackcomb!",
+      "friendlyResponse": "The resort with the highest combined rating from all user reviews is Whistler Blackcomb, with a total rating of 26.",
       "error": "None"
     }
   ]

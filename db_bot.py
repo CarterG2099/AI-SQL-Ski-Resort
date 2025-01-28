@@ -110,7 +110,7 @@ for strategy in strategies:
             queryRawResponse = str(runSql(sqlSyntaxResponse))
             print(queryRawResponse)
             #Give it all of the context
-            friendlyResultsPrompt = "I asked a question \"" + question +"\" and the response was \""+queryRawResponse+"\" Please, just give a concise response in a more friendly way? Please do not give any other suggests or chatter."
+            friendlyResultsPrompt = "Here is my table setup" + setupSqlScript + "\nI asked a question \"" + question +"\" and the response was \""+queryRawResponse+"\" Please, just give a concise response in a more friendly way? Please do not give any other suggests or chatter."
             friendlyResponse = getChatGptResponse(friendlyResultsPrompt)
             print(friendlyResponse)
         except Exception as err:
