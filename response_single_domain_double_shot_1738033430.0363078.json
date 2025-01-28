@@ -1,0 +1,76 @@
+{
+  "strategy": "single_domain_double_shot",
+  "prompt_prefix": "create table ikon_users (\n    user_id integer primary key,\n    first_name varchar(50) not null,\n    last_name varchar(50) not null,\n    email varchar(100) unique not null,\n    date_of_birth text,\n    skill_level varchar(20) not null check (skill_level in ('Beginner', 'Intermediate', 'Advanced', 'Expert'))\n);\n\ncreate table ikon_resorts (\n    resort_id integer primary key,\n    name varchar(100) not null,\n    location varchar(255) not null,\n    elevation integer,\n    total_trails integer\n);\n\ncreate table ikon_phone (\n    phone_id integer primary key,\n    entity_id integer not null,\n    entity_type varchar(20) not null check (entity_type in ('User', 'Resort')),\n    phone_number varchar(15) not null\n);\n\ncreate table ikon_address (\n    address_id integer primary key,\n    entity_id integer not null,\n    entity_type varchar(20) not null check (entity_type in ('User', 'Resort')),\n    street varchar(255) not null,\n    city varchar(100) not null,\n    state varchar(50) not null,\n    zip_code varchar(20) not null\n);\n\ncreate table ikon_trails (\n    trail_id integer primary key,\n    resort_id integer not null,\n    name varchar(100) not null,\n    difficulty varchar(20) not null check (difficulty in ('Green', 'Blue', 'Black', 'Double Black')),\n    length_km real,\n    foreign key (resort_id) references ikon_resorts (resort_id)\n);\n\ncreate table ikon_rentals (\n    rental_id integer primary key,\n    user_id integer not null,\n    equipment_type varchar(20) not null check (equipment_type in ('Ski', 'Snowboard', 'Boots', 'Helmet')),\n    rental_date text not null,\n    return_date text,\n    cost real,\n    foreign key (user_id) references ikon_users (user_id)\n);\n\ncreate table ikon_events (\n    event_id integer primary key,\n    resort_id integer not null,\n    name varchar(100) not null,\n    event_date text not null,\n    description text,\n    foreign key (resort_id) references ikon_resorts (resort_id)\n);\n\ncreate table ikon_lift_tickets (\n    ticket_id integer primary key,\n    user_id integer not null,\n    resort_id integer not null,\n    ticket_type varchar(20) not null check (ticket_type in ('Base', 'Session', 'Plus')),\n    purchase_date text not null,\n    price real,\n    foreign key (user_id) references ikon_users (user_id),\n    foreign key (resort_id) references ikon_resorts (resort_id)\n);\n\ncreate table ikon_weather_reports (\n    report_id integer primary key,\n    resort_id integer not null,\n    report_date text not null,\n    temperature_c real,\n    snow_depth_cm integer,\n    conditions varchar(20) not null check (conditions in ('Sunny', 'Cloudy', 'Snowing', 'Windy')),\n    foreign key (resort_id) references ikon_resorts (resort_id)\n);\n\ncreate table ikon_reviews (\n    review_id integer primary key,\n    user_id integer not null,\n    resort_id integer not null,\n    rating integer check (rating >= 1 and rating <= 5),\n    review_text text,\n    review_date text not null,\n    foreign key (user_id) references ikon_users (user_id),\n    foreign key (resort_id) references ikon_resorts (resort_id)\n);\nWho hasn't rented equipment?  \nSELECT u.user_id, u.first_name, u.last_name\nFROM ikon_users u\nLEFT JOIN ikon_rentals r ON u.user_id = r.user_id\nWHERE r.rental_id IS NULL;\n  Give me a sqlite select statement that answers the question. Only respond with sqlite syntax. If there is an error do not expalin it!",
+  "questionResults": [
+    {
+      "question": "Which are the highest rated resorts and what is the average rating of each?",
+      "sql": "\nSELECT r.resort_id, r.name, AVG(rv.rating) AS average_rating\nFROM ikon_resorts r\nJOIN ikon_reviews rv ON r.resort_id = rv.resort_id\nGROUP BY r.resort_id, r.name\nORDER BY average_rating DESC;\n",
+      "queryRawResponse": "[(2, 'Whistler Blackcomb', 4.333333333333333), (1, 'Aspen Snowmass', 4.0), (3, 'Park City Mountain', 4.0)]",
+      "friendlyResponse": "Here are the highest rated resorts:\n\n1. **Whistler Blackcomb** - Average Rating: 4.33\n2. **Aspen Snowmass** - Average Rating: 4.0\n3. **Park City Mountain** - Average Rating: 4.0",
+      "error": "None"
+    },
+    {
+      "question": "Which users rented equipment for more than 3 days and which resorts did they visit and what was the total cost of their trip including equipment and lift ticket?",
+      "sql": "\nSELECT u.user_id, u.first_name, u.last_name, r.user_id, re.name AS resort_name, SUM(r.cost + lt.price) AS total_cost\nFROM ikon_users u\nJOIN ikon_rentals r ON u.user_id = r.user_id\nJOIN ikon_lift_tickets lt ON u.user_id = lt.user_id\nJOIN ikon_resorts re ON lt.resort_id = re.resort_id\nWHERE DATE(r.return_date) - DATE(r.rental_date) > 3\nGROUP BY u.user_id, re.resort_id;\n",
+      "queryRawResponse": "[]",
+      "friendlyResponse": "It seems there are no users who rented equipment for more than 3 days.",
+      "error": "None"
+    },
+    {
+      "question": "What is the ratio of people who rent equipment and ski double black vs those who ski blue?",
+      "sql": "\nSELECT \n    (SELECT COUNT(DISTINCT r.user_id) \n     FROM ikon_rentals r \n     JOIN ikon_trails t ON r.user_id = t.resort_id \n     WHERE r.equipment_type IN ('Ski', 'Snowboard') \n       AND t.difficulty = 'Double Black') AS double_black_renters,\n    (SELECT COUNT(DISTINCT r.user_id) \n     FROM ikon_rentals r \n     JOIN ikon_trails t ON r.user_id = t.resort_id \n     WHERE r.equipment_type IN ('Ski', 'Snowboard') \n       AND t.difficulty = 'Blue') AS blue_renters\n",
+      "queryRawResponse": "[(1, 1)]",
+      "friendlyResponse": "The ratio of people who rent equipment and ski double black to those who ski blue is 1:1.",
+      "error": "None"
+    },
+    {
+      "question": "What is the average temperature and snow depth for each resort in January 2025?",
+      "sql": "\nSELECT r.resort_id, AVG(w.temperature_c) AS average_temperature, AVG(w.snow_depth_cm) AS average_snow_depth\nFROM ikon_weather_reports w\nJOIN ikon_resorts r ON w.resort_id = r.resort_id\nWHERE strftime('%Y-%m', w.report_date) = '2025-01'\nGROUP BY r.resort_id;\n",
+      "queryRawResponse": "[(1, -5.0, 50.0), (2, -3.0, 60.0), (3, -8.0, 70.0)]",
+      "friendlyResponse": "Sure! Here are the average temperatures and snow depths for each resort in January 2025:\n\n- Resort 1: Average temp -5.0\u00b0C, Snow depth 50.0 cm\n- Resort 2: Average temp -3.0\u00b0C, Snow depth 60.0 cm\n- Resort 3: Average temp -8.0\u00b0C, Snow depth 70.0 cm",
+      "error": "None"
+    },
+    {
+      "question": "Which people travelled out of state to ski and what was the total cost of their trip?",
+      "sql": "\nSELECT u.user_id, u.first_name, u.last_name, SUM(r.cost) AS total_cost\nFROM ikon_users u\nJOIN ikon_rentals r ON u.user_id = r.user_id\nJOIN ikon_address a ON u.user_id = a.entity_id AND a.entity_type = 'User'\nWHERE a.state != 'YourState'  -- Replace 'YourState' with the specific state of the resorts\nGROUP BY u.user_id;\n",
+      "queryRawResponse": "[(1, 'Laura', 'Stevenson', 200.0), (2, 'Bob', 'Jones', 180.0), (3, 'Charlie', 'Brown', 20.0)]",
+      "friendlyResponse": "Sure! Here are the people who traveled out of state to ski along with their trip costs: \n\n- Laura Stevenson: $200.00\n- Bob Jones: $180.00\n- Charlie Brown: $20.00",
+      "error": "None"
+    },
+    {
+      "question": "What is the ratio of people who got the base, session, and plus passes and what is the total revenue from those passes?",
+      "sql": "ite\nSELECT \n    ticket_type, \n    COUNT(user_id) AS number_of_tickets, \n    SUM(price) AS total_revenue \nFROM ikon_lift_tickets \nGROUP BY ticket_type;\n",
+      "queryRawResponse": "[(1, 'Laura', 'Stevenson', 200.0), (2, 'Bob', 'Jones', 180.0), (3, 'Charlie', 'Brown', 20.0)]",
+      "friendlyResponse": "Sure! Here are the people who traveled out of state to ski along with their trip costs: \n\n- Laura Stevenson: $200.00\n- Bob Jones: $180.00\n- Charlie Brown: $20.00",
+      "error": "near \"ite\": syntax error"
+    },
+    {
+      "question": "Which resort has the highest elevation, and how many trails does it offer?",
+      "sql": "\nSELECT name, elevation, total_trails \nFROM ikon_resorts \nORDER BY elevation DESC \nLIMIT 1;\n",
+      "queryRawResponse": "[('Aspen Snowmass', 8104, 150)]",
+      "friendlyResponse": "The resort with the highest elevation is Aspen Snowmass, which stands at 8,104 feet and offers 150 trails.",
+      "error": "None"
+    },
+    {
+      "question": "What is the distribution of skill levels among users who visited Aspen Snowmass?",
+      "sql": "\nSELECT u.skill_level, COUNT(u.user_id) AS user_count\nFROM ikon_users u\nJOIN ikon_lift_tickets t ON u.user_id = t.user_id\nJOIN ikon_resorts r ON t.resort_id = r.resort_id\nWHERE r.name = 'Aspen Snowmass'\nGROUP BY u.skill_level;\n",
+      "queryRawResponse": "[('Advanced', 1)]",
+      "friendlyResponse": "It looks like there was one advanced user who visited Aspen Snowmass!",
+      "error": "None"
+    },
+    {
+      "question": "What is the average length of 'Green' trails across all resorts?",
+      "sql": "\nSELECT AVG(length_km) AS average_length\nFROM ikon_trails\nWHERE difficulty = 'Green';\n",
+      "queryRawResponse": "[(6.0,)]",
+      "friendlyResponse": "The average length of 'Green' trails across all resorts is 6.0 miles.",
+      "error": "None"
+    },
+    {
+      "question": "Which resort has the highest combined rating from all user reviews?",
+      "sql": "\nSELECT r.resort_id, r.name, SUM(re.rating) as total_rating\nFROM ikon_resorts r\nJOIN ikon_reviews re ON r.resort_id = re.resort_id\nGROUP BY r.resort_id, r.name\nORDER BY total_rating DESC\nLIMIT 1;\n",
+      "queryRawResponse": "[(2, 'Whistler Blackcomb', 26)]",
+      "friendlyResponse": "The resort with the highest combined rating from all user reviews is Whistler Blackcomb!",
+      "error": "None"
+    }
+  ]
+}
